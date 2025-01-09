@@ -130,6 +130,7 @@ def pause_menu():
             shadow_color,
         )
 
+
         resume_pos = (screen_width // 2, screen_height // 2 - 50)
         restart_pos = (screen_width // 2, screen_height // 2)
         menu_pos = (screen_width // 2, screen_height // 2 + 50)
@@ -176,6 +177,67 @@ def pause_menu():
 
         pygame.display.flip()
 
+def play_options_screen():
+    global running, screen, fullscreen, screen_width, screen_height, scaled_background, game_state
+    single_player_scaled = pygame.transform.scale(single_player_image, (300, 300))  # Tamanho inicial da imagem do botão
+
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:  
+                    return
+                elif event.key == pygame.K_F11:  
+                    fullscreen = not fullscreen
+                    if fullscreen:
+                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        screen_width, screen_height = screen.get_size()
+                    else:
+                        screen_width, screen_height = 800, 600
+                        screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                    scaled_background = scale_background()
+
+            elif event.type == pygame.VIDEORESIZE and not fullscreen:
+                screen_width, screen_height = event.w, event.h
+                screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                scaled_background = scale_background()
+                single_player_scaled = pygame.transform.scale(single_player_image, (screen_width // 4, screen_width // 4))
+
+        screen.blit(scaled_background, (0, 0))
+
+        button_spacing = screen_width / 2  
+        single_pos = (screen_width // 2 - button_spacing // 1.8, screen_height // 2)
+        multi_pos_left = (screen_width // 2 + button_spacing // 2 - 50, screen_height // 2) 
+        multi_pos_right = (screen_width // 2 + button_spacing // 2 + 150, screen_height // 2)  
+
+      
+        single_rect = single_player_scaled.get_rect(center=single_pos)
+
+       
+        multi_rect_left = single_player_scaled.get_rect(center=multi_pos_left)
+        multi_rect_right = single_player_scaled.get_rect(center=multi_pos_right)
+
+        screen.blit(single_player_scaled, single_rect.topleft)  
+        screen.blit(single_player_scaled, multi_rect_left.topleft)  
+        screen.blit(single_player_scaled, multi_rect_right.topleft)  
+
+        single_text_pos = (single_rect.centerx, single_rect.bottom + 30)
+        multi_text_pos = (multi_rect_left.centerx + 150, multi_rect_left.bottom + 30)  
+
+        draw_text_button(screen, "Single Player", single_text_pos, small_font, (255, 255, 255), (180, 180, 180), shadow_color)
+        draw_text_button(screen, "Multiplayer", multi_text_pos, small_font, (255, 255, 255), (180, 180, 180), shadow_color)
+
+        # Verifica clique nos botões
+        mouse_pos = pygame.mouse.get_pos()
+        if single_rect.collidepoint(mouse_pos) and pygame.mouse.get_pressed()[0]:
+            print("Single Player selecionado!")
+            game_state = "single_player" 
+            return
+        if (multi_rect_left.collidepoint(mouse_pos) or multi_rect_right.collidepoint(mouse_pos)) and pygame.mouse.get_pressed()[0]:
+            print("Multiplayer selecionado!")
+            game_state = "menu"
+        pygame.display.flip()
 
 def draw_health_bar(enemy):
     max_health = 3
@@ -590,7 +652,7 @@ while running:
             button_hover_color,
             shadow_color,
         ):
-            game_state = "single_player"
+            game_state = "play_options"
         if draw_text_button(
             screen,
             "Options",
@@ -611,6 +673,9 @@ while running:
             shadow_color,
         ):
             running = False
+
+    elif game_state == "play_options":
+        play_options_screen()
 
     elif game_state == "single_player":
 
