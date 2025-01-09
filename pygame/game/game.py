@@ -10,12 +10,11 @@ screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE
 pygame.display.set_caption("Stellar Conquest")
 
 # Configuração dos botões
-font = pygame.font.SysFont("Arial", 40)
-button_width, button_height = 200, 60
-button_spacing = 20
-button_base_color = (232, 60, 126)  # Cor do botão
-button_hover_color = (255, 80, 150)  # Cor ao passar o mouse
-button_border_color = (232, 60, 126)  # Cor das bordas
+font = pygame.font.SysFont("Arial", 50, bold=True)  # Fonte maior e em negrito
+button_spacing = 40
+button_text_color = (232, 60, 126)  # Cor do texto base
+button_hover_color = (255, 105, 180)  # Cor ao passar o mouse (vibrante)
+shadow_color = (150, 30, 90)  # Cor para a sombra do texto
 
 # Caminho completo para a imagem
 image_path = r"C:\Users\NelsinT\Desktop\pygame\pygame\imagens\homescreen.png"
@@ -39,21 +38,27 @@ except pygame.error as e:
     sys.exit()
 
 
-def draw_button(screen, text, rect, font, base_color, hover_color, border_color):
+def draw_text_button(screen, text, position, font, base_color, hover_color, shadow_color):
     mouse_pos = pygame.mouse.get_pos()
-    is_hovered = rect.collidepoint(mouse_pos)
+
+    # Verifica se o mouse está sobre o texto
+    text_surface = font.render(text, True, base_color)
+    text_rect = text_surface.get_rect(center=position)
+    is_hovered = text_rect.collidepoint(mouse_pos)
+
+    # Altera a cor do texto ao passar o mouse
     color = hover_color if is_hovered else base_color
+    text_surface = font.render(text, True, color)
 
-    # Desenha o botão
-    pygame.draw.rect(screen, color, rect)
-    pygame.draw.rect(screen, border_color, rect, 2)  # Borda personalizada
+    # Adiciona sombra ao texto
+    shadow_surface = font.render(text, True, shadow_color)
+    shadow_rect = shadow_surface.get_rect(center=(position[0] + 2, position[1] + 2))  # Leve deslocamento para sombra
+    screen.blit(shadow_surface, shadow_rect)
 
-    # Desenha o texto
-    text_surface = font.render(text, True, (255, 255, 255))
-    text_rect = text_surface.get_rect(center=rect.center)
+    # Desenha o texto principal
     screen.blit(text_surface, text_rect)
 
-    # Retorna True se o botão foi clicado
+    # Retorna True se o texto foi clicado
     return is_hovered and pygame.mouse.get_pressed()[0]
 
 
@@ -75,17 +80,17 @@ while running:
     # Exibe a imagem na tela redimensionada
     screen.blit(homescreen_image, (0, 0))
 
-    # Recalcula as posições dos botões para manter a centralização
-    play_button = pygame.Rect((screen_width // 2 - button_width // 2, screen_height // 2 - button_height - button_spacing), (button_width, button_height))
-    options_button = pygame.Rect((screen_width // 2 - button_width // 2, screen_height // 2), (button_width, button_height))
-    exit_button = pygame.Rect((screen_width // 2 - button_width // 2, screen_height // 2 + button_height + button_spacing), (button_width, button_height))
+    # Calcula as posições dos textos (botões) para manter a centralização
+    play_position = (screen_width // 2, screen_height // 2 - 50 - button_spacing)
+    options_position = (screen_width // 2, screen_height // 2)
+    exit_position = (screen_width // 2, screen_height // 2 + 50 + button_spacing)
 
-    # Desenha os botões e detecta cliques
-    if draw_button(screen, "Play", play_button, font, button_base_color, button_hover_color, button_border_color):
+    # Desenha os textos (botões) e detecta cliques
+    if draw_text_button(screen, "Play", play_position, font, button_text_color, button_hover_color, shadow_color):
         print("Play button clicked!")  # Ação do botão Play
-    if draw_button(screen, "Options", options_button, font, button_base_color, button_hover_color, button_border_color):
+    if draw_text_button(screen, "Options", options_position, font, button_text_color, button_hover_color, shadow_color):
         print("Options button clicked!")  # Ação do botão Options
-    if draw_button(screen, "Exit", exit_button, font, button_base_color, button_hover_color, button_border_color):
+    if draw_text_button(screen, "Exit", exit_position, font, button_text_color, button_hover_color, shadow_color):
         running = False  # Fecha o programa
 
     # Atualiza o display
