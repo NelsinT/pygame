@@ -22,9 +22,9 @@ button_hover_color = (255, 105, 180)
 shadow_color = (150, 30, 90)
 
 # Caminho completo para a imagem
-image_path = r"C:\Users\NelsinT\Desktop\pygame\pygame\imagens\homescreen.png"
-icon_path = r"C:\Users\NelsinT\Desktop\pygame\pygame\imagens\icon.png"
-music_path = r"C:\Users\NelsinT\Desktop\pygame\pygame\soundtrack\background_music.mp3"
+image_path = r"imagens\homescreen.png"
+icon_path = r"imagens\icon.png"
+music_path = r"soundtrack\background_music.mp3"
 config_path = "config.csv"
 
 # Função para carregar ou criar configurações
@@ -32,32 +32,24 @@ def load_config():
     if os.path.exists(config_path):
         df = pd.read_csv(config_path)
         config = df.iloc[0].to_dict()
-        # Garante que as chaves necessárias existam
         if "fullscreen" not in config:
             config["fullscreen"] = False
         if "volume" not in config:
             config["volume"] = 0.5
         return config
     else:
-        # Configuração padrão inicial
         default_config = {"volume": 0.5, "fullscreen": False}
         save_config(default_config)
         return default_config
 
 def save_config(config):
-    df = pd.DataFrame([config])  # Cria um DataFrame com os dados
+    df = pd.DataFrame([config])
     df.to_csv(config_path, index=False)
 
 # Carrega as configurações do arquivo
 config = load_config()
 volume = config["volume"]
 fullscreen = config["fullscreen"]
-
-# Configura o modo da janela baseado no estado de fullscreen
-if fullscreen:
-    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-else:
-    screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
 
 # Carrega a imagem da homescreen
 try:
@@ -66,6 +58,19 @@ except pygame.error as e:
     print(f"Erro ao carregar a imagem: {e}")
     pygame.quit()
     sys.exit()
+
+# Ajusta a tela inicial com base no fullscreen
+if fullscreen:
+    screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    screen_width, screen_height = screen.get_size()
+else:
+    screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+
+# Função para redimensionar a imagem de fundo
+def scale_background():
+    return pygame.transform.scale(homescreen_image, (screen_width, screen_height))
+
+scaled_background = scale_background()
 
 # Carrega e define o ícone
 try:
@@ -79,7 +84,7 @@ except pygame.error as e:
 # Carrega e reproduz a música de fundo
 try:
     pygame.mixer.music.load(music_path)
-    pygame.mixer.music.set_volume(volume)  # Define o volume inicial
+    pygame.mixer.music.set_volume(volume)
     pygame.mixer.music.play(-1)
 except pygame.error as e:
     print(f"Erro ao carregar a música: {e}")
@@ -101,17 +106,18 @@ def draw_text_button(screen, text, position, font, base_color, hover_color, shad
     return is_hovered and pygame.mouse.get_pressed()[0]
 
 
-def options_menu(screen):
-    global fullscreen  # Para modificar o estado globalmente
-    global volume  # Para modificar o volume globalmente
+def options_menu():
+    global fullscreen, volume, screen_width, screen_height, screen, scaled_background
     running = True
     slider_width = 200
-    slider_x = 400 + int(volume * slider_width)  # Calcula posição inicial do slider com base no volume
+
+    # Calcula a posição inicial da bola com base no volume atual
+    slider_x = (screen_width // 2 - slider_width // 2) + int(volume * slider_width)
+    dragging = False  # Para controlar o arrasto do slider
 
     while running:
-        screen.fill((30, 30, 30))  # Cor de fundo para a tela de opções
+        screen.blit(scaled_background, (0, 0))  # Desenha o fundo redimensionado
 
-        # Eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -120,34 +126,48 @@ def options_menu(screen):
                 if event.key == pygame.K_ESCAPE:
                     running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if toggle_rect.collidepoint(pygame.mouse.get_pos()):
+                if slider_rect.collidepoint(pygame.mouse.get_pos()):
+                    dragging = True  # Começa a arrastar
+                elif toggle_rect.collidepoint(pygame.mouse.get_pos()):
                     fullscreen = not fullscreen
                     if fullscreen:
                         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        screen_width, screen_height = screen.get_size()
                     else:
-                        screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                        screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
+                        screen_width, screen_height = 800, 600
+                    scaled_background = scale_background()
+            elif event.type == pygame.MOUSEBUTTONUP:
+                dragging = False  # Para o arrasto
+            elif event.type == pygame.MOUSEMOTION and dragging:
+                slider_x = pygame.mouse.get_pos()[0]
+                slider_x = max(slider_rect.x, min(slider_x, slider_rect.x + slider_width))
+                volume = (slider_x - slider_rect.x) / slider_width
+                pygame.mixer.music.set_volume(volume)
 
-                # Controle de volume pelo slider
-                if slider_rect.collidepoint(pygame.mouse.get_pos()):
-                    slider_x = pygame.mouse.get_pos()[0]
-                    slider_x = max(slider_rect.x, min(slider_x, slider_rect.x + slider_width))
-                    volume = (slider_x - slider_rect.x) / slider_width
-                    pygame.mixer.music.set_volume(volume)
+        # Calcula posições centralizadas
+        center_x = screen_width // 2
+        center_y = screen_height // 2
 
-        # Renderiza o botão de tela cheia (toggle)
+        # Renderiza o botão de fullscreen centralizado
         toggle_text = "Fullscreen: ON" if fullscreen else "Fullscreen: OFF"
-        toggle_rect = pygame.Rect(300, 200, 200, 50)
-        pygame.draw.rect(screen, (80, 80, 80), toggle_rect)
+        toggle_rect = pygame.Rect(center_x - 100, center_y - 100, 200, 50)  # Acima do texto de volume
         draw_text_button(screen, toggle_text, toggle_rect.center, small_font, (255, 255, 255), (180, 180, 180), shadow_color)
 
-        # Renderiza o slider de volume
+        # Renderiza o texto de volume centralizado
         volume_text = small_font.render("Volume:", True, (255, 255, 255))
-        screen.blit(volume_text, (250, 300))
-        slider_rect = pygame.Rect(400, 310, slider_width, 10)
-        pygame.draw.rect(screen, (100, 100, 100), slider_rect)
-        pygame.draw.circle(screen, (255, 0, 0), (slider_x, slider_rect.y + 5), 10)
+        screen.blit(volume_text, (center_x - volume_text.get_width() // 2, center_y - 20))
 
-        # Atualiza a tela
+        # Renderiza o slider de volume centralizado abaixo do texto
+        slider_rect = pygame.Rect(center_x - slider_width // 2, center_y + 10, slider_width, 10)
+        pygame.draw.rect(screen, (100, 100, 100), slider_rect)
+        pygame.draw.circle(screen, (255, 0, 0), (int(slider_x), slider_rect.y + 5), 10)
+
+        # Exibe a porcentagem do volume imediatamente abaixo da barra
+        volume_percent = f"{int(volume * 100)}%"  # Calcula a porcentagem
+        volume_percent_text = small_font.render(volume_percent, True, (255, 255, 255))
+        screen.blit(volume_percent_text, (center_x - volume_percent_text.get_width() // 2, slider_rect.y + 20))
+
         pygame.display.flip()
 
     # Salva o estado de fullscreen e volume
@@ -156,21 +176,21 @@ def options_menu(screen):
     save_config(config)
 
 
-# Loop principal
+
+
+
+
 running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                running = False
-        elif event.type == pygame.VIDEORESIZE and not fullscreen:
-            screen_width, screen_height = event.w, event.h
-            screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
-            homescreen_image = pygame.transform.scale(homescreen_image, (screen_width, screen_height))
+            if event.type == pygame.VIDEORESIZE and not fullscreen:
+                screen_width, screen_height = event.w, event.h
+                screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                scaled_background = scale_background()
 
-    scaled_background = pygame.transform.scale(homescreen_image, (screen_width, screen_height))
     screen.blit(scaled_background, (0, 0))
 
     play_position = (screen_width // 2, screen_height // 2 - 50 - button_spacing)
@@ -180,7 +200,7 @@ while running:
     if draw_text_button(screen, "Play", play_position, font, button_text_color, button_hover_color, shadow_color):
         print("Play button clicked!")
     if draw_text_button(screen, "Options", options_position, font, button_text_color, button_hover_color, shadow_color):
-        options_menu(screen)  # Passa o screen para a função
+        options_menu()
     if draw_text_button(screen, "Exit", exit_position, font, button_text_color, button_hover_color, shadow_color):
         running = False
 
