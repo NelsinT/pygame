@@ -12,7 +12,7 @@ screen_width, screen_height = 800, 600  # Dimensões padrão da janela
 fullscreen = False  # Começa com fullscreen desativado
 screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)  # Janela redimensionável
 pygame.display.set_caption("Stellar Conquest")
-
+game_state = "menu"  # Pode ser "menu", "play_options", etc.
 # Configuração dos botões
 font = pygame.font.SysFont("Arial", 50, bold=True)
 small_font = pygame.font.SysFont("Arial", 30)
@@ -26,6 +26,7 @@ image_path = r"imagens\homescreen.png"
 icon_path = r"imagens\icon.png"
 music_path = r"soundtrack\background_music.mp3"
 single_player_image_path = r"imagens\single_player.png"
+multiplayer_image_path = r"imagens\multi_player.png"
 config_path = "config.csv"
 
 # Função para carregar ou criar configurações
@@ -51,6 +52,14 @@ def save_config(config):
 config = load_config()
 volume = config["volume"]
 fullscreen = config["fullscreen"]
+
+try:
+    single_player_image = pygame.image.load(single_player_image_path)
+    multiplayer_image = pygame.image.load(multiplayer_image_path)
+except pygame.error as e:
+    print(f"Erro ao carregar imagens dos botões: {e}")
+    pygame.quit()
+    sys.exit()
 
 # Carrega a imagem da homescreen
 try:
@@ -106,6 +115,65 @@ def draw_text_button(screen, text, position, font, base_color, hover_color, shad
     screen.blit(shadow_surface, shadow_rect)
     screen.blit(text_surface, text_rect)
     return is_hovered and pygame.mouse.get_pressed()[0]
+
+# Função para exibir a tela de opções de jogo
+# Modificar a função play_options_screen para incluir o redimensionamento e F11
+def play_options_screen():
+    global running, screen, fullscreen, screen_width, screen_height, scaled_background
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:  # Voltar para o menu principal
+                    return
+                elif event.key == pygame.K_F11:  # Alternar fullscreen
+                    fullscreen = not fullscreen
+                    if fullscreen:
+                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        screen_width, screen_height = screen.get_size()
+                    else:
+                        screen_width, screen_height = 800, 600
+                        screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                    scaled_background = scale_background()
+            elif event.type == pygame.VIDEORESIZE and not fullscreen:
+                # Redimensiona a janela no modo janela
+                screen_width, screen_height = event.w, event.h
+                screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                scaled_background = scale_background()
+
+        # Desenha o fundo redimensionado
+        screen.blit(scaled_background, (0, 0))
+
+        # Centraliza os botões na tela com espaço extra entre eles
+        button_spacing = 300  # Ajuste do espaço horizontal
+        extra_offset = 250  # Valor para mover o botão multiplayer mais para a direita
+        negative_offset = -150
+        single_pos = (screen_width // 2 - button_spacing // 2 + negative_offset, screen_height // 2 - 50)
+        multi_pos = (screen_width // 2 + button_spacing // 2 + extra_offset, screen_height // 2 - 50)
+
+        # Exibe imagens para as opções
+        single_rect = single_player_image.get_rect(center=single_pos)
+        multi_rect = multiplayer_image.get_rect(center=multi_pos)
+
+        screen.blit(single_player_image, single_rect.topleft)
+        screen.blit(multiplayer_image, multi_rect.topleft)
+
+        # Desenha o texto abaixo das imagens
+        single_text_pos = (single_rect.centerx, single_rect.bottom + 30)
+        multi_text_pos = (multi_rect.centerx, multi_rect.bottom + 30)
+
+        draw_text_button(screen, "Single Player", single_text_pos, small_font, (255, 255, 255), (180, 180, 180), shadow_color)
+        draw_text_button(screen, "Multiplayer", multi_text_pos, small_font, (255, 255, 255), (180, 180, 180), shadow_color)
+
+        # Verifica clique nos botões
+        mouse_pos = pygame.mouse.get_pos()
+        if single_rect.collidepoint(mouse_pos) and pygame.mouse.get_pressed()[0]:
+            print("Single Player selecionado!")
+        if multi_rect.collidepoint(mouse_pos) and pygame.mouse.get_pressed()[0]:
+            print("Multiplayer selecionado!")
+
+        pygame.display.flip()
 
 
 def options_menu():
@@ -194,9 +262,9 @@ running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            running = False  # ALT + F4 já dispara esse evento
+            running = False
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_F11:  # Alterna fullscreen com F11
+            if event.key == pygame.K_F11:
                 fullscreen = not fullscreen
                 if fullscreen:
                     screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -204,28 +272,32 @@ while running:
                 else:
                     screen_width, screen_height = 800, 600
                     screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
-                scaled_background = scale_background()  # Atualiza o fundo redimensionado
-
+                scaled_background = scale_background()
         elif event.type == pygame.VIDEORESIZE and not fullscreen:
-            # Redimensiona a janela no modo janela
             screen_width, screen_height = event.w, event.h
             screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
-            scaled_background = scale_background()  # Atualiza o fundo redimensionado
+            scaled_background = scale_background()
 
-    # Desenha o fundo redimensionado
-    screen.blit(scaled_background, (0, 0))
+    # Gerencia o estado do jogo
+    if game_state == "menu":
+        # Desenha o fundo redimensionado
+        screen.blit(scaled_background, (0, 0))
 
-    # Exibe os botões
-    play_position = (screen_width // 2, screen_height // 2 - 50 - button_spacing)
-    options_position = (screen_width // 2, screen_height // 2)
-    exit_position = (screen_width // 2, screen_height // 2 + 50 + button_spacing)
+        # Exibe os botões do menu principal
+        play_position = (screen_width // 2, screen_height // 2 - 50 - button_spacing)
+        options_position = (screen_width // 2, screen_height // 2)
+        exit_position = (screen_width // 2, screen_height // 2 + 50 + button_spacing)
 
-    if draw_text_button(screen, "Play", play_position, font, button_text_color, button_hover_color, shadow_color):
-        print("Play button clicked!")
-    if draw_text_button(screen, "Options", options_position, font, button_text_color, button_hover_color, shadow_color):
-        options_menu()
-    if draw_text_button(screen, "Exit", exit_position, font, button_text_color, button_hover_color, shadow_color):
-        running = False
+        if draw_text_button(screen, "Play", play_position, font, button_text_color, button_hover_color, shadow_color):
+            game_state = "play_options"  # Troca para a tela de opções de jogo
+        if draw_text_button(screen, "Options", options_position, font, button_text_color, button_hover_color, shadow_color):
+            options_menu()
+        if draw_text_button(screen, "Exit", exit_position, font, button_text_color, button_hover_color, shadow_color):
+            running = False
+
+    elif game_state == "play_options":
+        play_options_screen()
+        game_state = "menu"  # Volta ao menu principal ao sair da tela de opções
 
     pygame.display.flip()
 
