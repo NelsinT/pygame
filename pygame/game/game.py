@@ -196,15 +196,8 @@ def pause_menu():
 
         pygame.display.flip()
 def shop_menu():
-    global game_state, current_round, enemies_to_kill, enemy_kills, credits, enemies, running , screen , screen_width, screen_height, scaled_background, fullscreen
-    # while game_state == "shop":
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             pygame.quit()
-    #             sys.exit()
-    #         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-    #             game_state = "single_player"  # Voltar ao jogo se o jogador pressionar Esc
-
+    global game_state, current_round, enemies_to_kill, enemy_kills, credits, enemies, running, screen, screen_width, screen_height, scaled_background, fullscreen , rocket_speed , bullet_speed,player_max_health,shoot_cooldown
+    
     while game_state == "shop":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -228,84 +221,98 @@ def shop_menu():
                 scaled_background = scale_background()
 
         screen.blit(scaled_background, (0, 0))
-        
-        # Definindo posições e tamanhos baseados em proporções da tela
+
+       # Exibir informações do jogador
         center_x = screen_width // 2
         base_y = screen_height // 2
         
         draw_text_button(
             screen,
             f"Round {current_round}",
-            (center_x, base_y - int(0.2 * screen_height)),  # 20% do topo
+            (center_x, base_y - int(0.25 * screen_height)),
             font,
-            (255, 255, 255),  # Texto branco
+            (255, 255, 255),
             (180, 180, 180),
             shadow_color,
         )
         draw_text_button(
             screen,
             f"Kills: {enemy_kills}/{enemies_to_kill}",
-            (center_x, base_y - int(0.15 * screen_height)),  # 15% do topo
+            (center_x, base_y - int(0.20 * screen_height)),
             small_font,
-            (255, 255, 255),  # Texto branco
+            (255, 255, 255),
             (180, 180, 180),
             shadow_color,
         )
         draw_text_button(
             screen,
-            f"Créditos: {credits}",
-            (center_x, base_y - int(0.1 * screen_height)),  # 10% do topo
+            f"Credits: {credits}",
+            (center_x, base_y - int(0.15 * screen_height)),
             small_font,
-            (255, 255, 255),  # Texto branco
+            (255, 255, 255),
             (180, 180, 180),
             shadow_color,
         )
-        
-        # Mostrar Upgrades
-        upgrade_text_position = (center_x, base_y - int(0.06 * screen_height))  # 6% do topo
-        for index, (upgrade_name, count) in enumerate(upgrades.items()):
-            base_text = f"{upgrade_name.capitalize()}: "
-            count_text = f"{count}/{upgrade_limits[upgrade_name]}"
 
-            # Desenhar parte do texto em branco
+        # Mostrar Upgrades
+        upgrade_text_position = (center_x, base_y - int(0.05 * screen_height))
+        vertical_spacing = 40  # Espaçamento entre cada linha de upgrade 
+
+        for index, (upgrade_name, count) in enumerate(upgrades.items()):
+            base_text = f"{upgrade_name.capitalize()}: {count}/{upgrade_limits[upgrade_name]}"
             draw_text_button(
                 screen,
                 base_text,
-                (upgrade_text_position[0], upgrade_text_position[1] + index * int(0.03 * screen_height)),  # 3% de altura para espaçamento
+                (upgrade_text_position[0], upgrade_text_position[1] + index * vertical_spacing),
                 small_font,
-                (255, 255, 255),  # Texto branco
+                (255, 255, 255),
                 (180, 180, 180),
                 shadow_color,
             )
 
-            # Desenhar parte do texto (nivel do upgrade) em vermelho
-            draw_text_button(
-                screen,
-                count_text,
-                (upgrade_text_position[0] + font.size(base_text)[0], upgrade_text_position[1] + index * int(0.03 * screen_height)),  # 3% de altura para espaçamento
-                small_font,
-                (255, 0, 0),  # Texto em vermelho
-                (180, 180, 180),
-                shadow_color,
-            )
+            # Botão de Upgrade
+            if count < upgrade_limits[upgrade_name]:
+                cost = 1 + count  # custo aumenta com o nível do upgrade
+                if credits >= cost:
+                    if draw_text_button(
+                        screen,
+                        f"Upgrade {upgrade_name.capitalize()} (Cost: {cost} Credits)",
+                        (upgrade_text_position[0], upgrade_text_position[1] + index * vertical_spacing + 25),  # Adiciona espaço extra para o botão
+                        small_font,
+                        (255, 255, 0),  # Cor para comprar
+                        (255, 200, 0),
+                        shadow_color,
+                    ):
+                        credits -= cost
+                        upgrades[upgrade_name] += 1
+                        # Aqui você pode aplicar o upgrade ao jogador
+                        if upgrade_name == "speed":
+                            rocket_speed += 3
+                        elif upgrade_name == "damage":
+                            bullet_speed += 2  # Exemplo de aumentar a velocidade da bala
+                        elif upgrade_name == "health":
+                            player_max_health += 15
+                            player_health = player_max_health  # Restaurar a saúde
+                        elif upgrade_name == "fire_rate":
+                            shoot_cooldown = max(0.1, shoot_cooldown - 0.06)  # Reduzindo o tempo de espera para disparar
 
         # Botão para Avançar para a Próxima Rodada
         if draw_text_button(
             screen,
             "Avançar para a próxima rodada",
-            (center_x, base_y + int(0.05 * screen_height)),  # 5% abaixo do centro
+            (center_x, base_y + int(0.10 * screen_height)),  # Ajusta a posição do botão
             small_font,
-            (255, 255, 255),  # Texto branco
+            (255, 255, 255),
             (180, 180, 180),
             shadow_color,
         ):
-            # Resetar a lista de inimigos para que eles não persistam
             enemies.clear()
             current_round += 1
-            enemies_to_kill += 5  # Aumentar inimigos a matar para a próxima rodada
-            game_state = "single_player"  # Retornar ao jogo
+            enemies_to_kill += 5  
+            game_state = "single_player"  
 
         pygame.display.flip()
+
 
 
 def draw_round_info():
@@ -750,6 +757,7 @@ def options_menu():
         )
 
         pygame.display.flip()
+        
 
     config["fullscreen"] = fullscreen
     config["volume"] = volume
@@ -813,7 +821,7 @@ while running:
             shadow_color,
         ):
             restart_game()  # Reinicie o jogo quando iniciar
-            game_state = "shop"
+            game_state = "single_player"
         if draw_text_button(
             screen,
             "Options",
@@ -845,7 +853,7 @@ while running:
         draw_credits_info()
         draw_kills_info()
 
-        # Movimento do foguete
+        # Movimento do fogete
         keys = pygame.key.get_pressed()
         if keys[pygame.K_w] or keys[pygame.K_UP]:
             rocket_position[1] -= rocket_speed * delta_time
