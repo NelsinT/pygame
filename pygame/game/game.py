@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import time
 import random
+import cv2
 
 pygame.init()
 pygame.mixer.init()  # musica fundo
@@ -33,12 +34,12 @@ enemy_image_path = r"imagens\enemy.png"
 config_path = "config.csv"
 
 #variaveis (:
-rocket_position = [screen_width // 10, screen_height // 10]
+
 rocket_speed = 5
 bullets = []
 bullet_width, bullet_height = 5, 10
 bullet_speed = 10
-bullet_color = (255, 255, 0)
+bullet_color = (0, 0, 0)
 shoot_cooldown = 0.5
 last_shot_time = 0
 enemy_kills = 0
@@ -50,20 +51,31 @@ player_max_health = 100
 player_health = player_max_health
 current_round = 1
 enemies_to_kill = 5 
+bullet_damage = 1  
+rocket_position = [screen_width // 10 * 9, screen_height // 10]  
+rocket2_position = [screen_width // 10 * 9, screen_height // 10] 
+
+rockets = [
+    {"position": rocket_position, "health": player_health},
+    {"position": rocket2_position, "health": player_health}
+]
 
 upgrade_limits = {
     "speed": 10,
     "damage": 10,
-    "health": 10,
     "fire_rate": 10,
 }
 
 upgrades = {
     "speed": 0,
     "damage": 0,
-    "health": 0,
     "fire_rate": 0,
 }
+
+bullets2 = []  
+bullet_color2 = (0, 255, 0)  
+last_shot_time2 = 0
+shoot_cooldown2 = 0.5 
 
 
 clock = pygame.time.Clock()
@@ -92,6 +104,15 @@ def shoot_bullet():
         bullet_y = rocket_position[1]
         bullets.append({"x": bullet_x, "y": bullet_y})
         last_shot_time = current_time
+
+def shoot_bullet2():
+    global last_shot_time2
+    current_time = time.time()
+    if current_time - last_shot_time2 >= shoot_cooldown2:
+        bullet_x = rocket2_position[0] + player_width // 2 - bullet_width // 2
+        bullet_y = rocket2_position[1]
+        bullets2.append({"x": bullet_x, "y": bullet_y})
+        last_shot_time2 = current_time
 
 
 def pause_menu():
@@ -196,12 +217,12 @@ def pause_menu():
 
         pygame.display.flip()
 def shop_menu():
-    global game_state, current_round, enemies_to_kill, enemy_kills, credits, enemies, running, screen, screen_width, screen_height, scaled_background, fullscreen , rocket_speed , bullet_speed,player_max_health,shoot_cooldown
+    global game_state, current_round, enemies_to_kill, enemy_kills, credits, enemies, running, screen, screen_width, screen_height, scaled_background, fullscreen, rocket_speed, bullet_speed, player_max_health, shoot_cooldown, bullet_damage 
     
     while game_state == "shop":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                running = False  # Isso vai fechar o jogo
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:  
                     game_state = "single_player"
@@ -222,14 +243,13 @@ def shop_menu():
 
         screen.blit(scaled_background, (0, 0))
 
-       # Exibir informações do jogador
         center_x = screen_width // 2
         base_y = screen_height // 2
         
         draw_text_button(
             screen,
             f"Round {current_round}",
-            (center_x, base_y - int(0.25 * screen_height)),
+            (center_x, base_y - int(screen_height * 0.30)),
             font,
             (255, 255, 255),
             (180, 180, 180),
@@ -238,25 +258,24 @@ def shop_menu():
         draw_text_button(
             screen,
             f"Kills: {enemy_kills}/{enemies_to_kill}",
-            (center_x, base_y - int(0.20 * screen_height)),
+            (center_x, base_y - int(screen_height * 0.14)),
             small_font,
-            (255, 255, 255),
+            (255, 0, 0),
             (180, 180, 180),
             shadow_color,
         )
         draw_text_button(
             screen,
             f"Credits: {credits}",
-            (center_x, base_y - int(0.15 * screen_height)),
+            (center_x, base_y - int(screen_height * 0.19)),
             small_font,
-            (255, 255, 255),
+            (255, 0, 0),
             (180, 180, 180),
             shadow_color,
         )
 
-        # Mostrar Upgrades
-        upgrade_text_position = (center_x, base_y - int(0.05 * screen_height))
-        vertical_spacing = 40  # Espaçamento entre cada linha de upgrade 
+        upgrade_text_position = (center_x, base_y - int(screen_height * 0.05))
+        vertical_spacing = int(screen_height * 0.058)  
 
         for index, (upgrade_name, count) in enumerate(upgrades.items()):
             base_text = f"{upgrade_name.capitalize()}: {count}/{upgrade_limits[upgrade_name]}"
@@ -270,37 +289,32 @@ def shop_menu():
                 shadow_color,
             )
 
-            # Botão de Upgrade
             if count < upgrade_limits[upgrade_name]:
-                cost = 1 + count  # custo aumenta com o nível do upgrade
+                cost = 1 + count 
                 if credits >= cost:
                     if draw_text_button(
                         screen,
                         f"Upgrade {upgrade_name.capitalize()} (Cost: {cost} Credits)",
-                        (upgrade_text_position[0], upgrade_text_position[1] + index * vertical_spacing + 25),  # Adiciona espaço extra para o botão
+                        (upgrade_text_position[0], upgrade_text_position[1] + index * vertical_spacing + int(screen_height * 0.25)),  
                         small_font,
-                        (255, 255, 0),  # Cor para comprar
+                        (255, 255, 0),  
                         (255, 200, 0),
                         shadow_color,
                     ):
                         credits -= cost
                         upgrades[upgrade_name] += 1
-                        # Aqui você pode aplicar o upgrade ao jogador
                         if upgrade_name == "speed":
                             rocket_speed += 3
                         elif upgrade_name == "damage":
-                            bullet_speed += 2  # Exemplo de aumentar a velocidade da bala
-                        elif upgrade_name == "health":
-                            player_max_health += 15
-                            player_health = player_max_health  # Restaurar a saúde
+                            bullet_damage += 0.2  
                         elif upgrade_name == "fire_rate":
-                            shoot_cooldown = max(0.1, shoot_cooldown - 0.06)  # Reduzindo o tempo de espera para disparar
+                            shoot_cooldown = max(0.1, shoot_cooldown - 0.04)  
 
-        # Botão para Avançar para a Próxima Rodada
+
         if draw_text_button(
             screen,
             "Avançar para a próxima rodada",
-            (center_x, base_y + int(0.10 * screen_height)),  # Ajusta a posição do botão
+            (center_x, base_y + int(screen_height * 0.15)),
             small_font,
             (255, 255, 255),
             (180, 180, 180),
@@ -312,16 +326,13 @@ def shop_menu():
             game_state = "single_player"  
 
         pygame.display.flip()
-
-
-
 def draw_round_info():
     round_text = small_font.render(f"Rodada: {current_round}", True, (255, 255, 255))
-    screen.blit(round_text, (screen_width - 150, 20))  # Desenha no canto superior direito
+    screen.blit(round_text, (screen_width - 150, 20)) 
     
 def play_options_screen():
-    global running, screen, fullscreen, screen_width, screen_height, scaled_background, game_state
-    single_player_scaled = pygame.transform.scale(single_player_image, (300, 300))  # Tamanho inicial da imagem do botão
+    global running, screen, fullscreen, screen_width, screen_height, scaled_background, game_state,player_health,player_max_health
+    single_player_scaled = pygame.transform.scale(single_player_image, (300, 300))  
 
     while running:
         for event in pygame.event.get():
@@ -369,31 +380,27 @@ def play_options_screen():
 
         draw_text_button(screen, "Single Player", single_text_pos, small_font, (255, 255, 255), (180, 180, 180), shadow_color)
         draw_text_button(screen, "Multiplayer", multi_text_pos, small_font, (255, 255, 255), (180, 180, 180), shadow_color)
-
-        # Verifica clique nos botões
         mouse_pos = pygame.mouse.get_pos()
         if single_rect.collidepoint(mouse_pos) and pygame.mouse.get_pressed()[0]:
             print("Single Player selecionado!")
             game_state = "single_player" 
-            player_health = 100
+            player_health = player_max_health
             return
         if (multi_rect_left.collidepoint(mouse_pos) or multi_rect_right.collidepoint(mouse_pos)) and pygame.mouse.get_pressed()[0]:
             print("Multiplayer selecionado!")
-            game_state = "menu"
+            game_state = "multiplayer"
+            player_health = player_max_health
+            return
         pygame.display.flip()
 
 def draw_player_health():
-    bar_width = 200  # Largura da barra
-    bar_height = 20  # Altura da barra
-    bar_x = 20       # Posição X da barra
-    bar_y = 20       # Posição Y da barra
-    health_ratio = player_health / player_max_health  # Proporção da vida
-
-    # Barra de fundo (vermelha)
+    bar_width = 200 
+    bar_height = 20
+    bar_x = 20 
+    bar_y = 20  
+    health_ratio = player_health / player_max_health 
     pygame.draw.rect(screen, (255, 0, 0), (bar_x, bar_y, bar_width, bar_height))
-    # Barra de saúde (verde)
     pygame.draw.rect(screen, (0, 255, 0), (bar_x, bar_y, int(bar_width * health_ratio), bar_height))
-
 
 def draw_health_bar(enemy):
     max_health = 3
@@ -410,14 +417,14 @@ def draw_health_bar(enemy):
 
 def restart_game():
     global player_health, rocket_position, bullets, enemies, enemy_kills, credits, game_over , current_round
-    player_health = 100  # Defina a saúde inicial do jogador
-    rocket_position = [screen_width // 2, screen_height // 2]  # Resetar a posição do jogador
-    bullets = []  # Reinicie a lista de balas
-    enemies = []  # Reinicie a lista de inimigos
-    enemy_kills = 0  # Reinicie o contador de inimigos eliminados
-    credits = 0  # Reinicie os créditos
+    player_health = 100 
+    rocket_position = [screen_width // 2, screen_height // 2]  
+    bullets = []  
+    enemies = []  
+    enemy_kills = 0  
+    credits = 0  
     current_round = 1
-    game_over = False  # Reinicie o estado de Game Over
+    game_over = False  
 
 
 def save_config(config):
@@ -431,15 +438,14 @@ fullscreen = config["fullscreen"]
 
 
 def spawn_enemy():
-    enemy_x = random.randint(0, screen_width - enemy_width)
-    enemy_y = -enemy_height
+    enemy_x = random.randint(0, screen_width - enemy_width) 
+    enemy_y = -enemy_height  
     enemies.append({"x": enemy_x, "y": enemy_y, "health": 3, "show_health_bar": False})
 
 
 try:
     single_player_image = pygame.image.load(single_player_image_path)
 except pygame.error as e:
-    print(f"Erro ao carregar imagens dos botões: {e}")
     pygame.quit()
     sys.exit()
 
@@ -450,7 +456,6 @@ try:
     enemy_image = pygame.transform.scale(enemy_image_path, enemy_size)
     enemy_width, enemy_height = enemy_image.get_size()
 except pygame.error as e:
-    print(f"Erro ao carregar a imagem do inimigo: {e}")
     pygame.quit()
     sys.exit()
 
@@ -461,7 +466,6 @@ try:
     player_image = pygame.transform.scale(player_image, new_player_size)
     player_width, player_height = player_image.get_size()
 except pygame.error as e:
-    print(f"Erro ao carregar a imagem do player: {e}")
     pygame.quit()
     sys.exit()
     sys.exit()
@@ -469,7 +473,6 @@ except pygame.error as e:
 try:
     homescreen_image = pygame.image.load(image_path)
 except pygame.error as e:
-    print(f"Erro ao carregar a imagem: {e}")
     pygame.quit()
     sys.exit()
 
@@ -480,20 +483,21 @@ else:
     screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
 
 
+
 def scale_background():
     return pygame.transform.scale(homescreen_image, (screen_width, screen_height))
 
 def game_over_screen():
-    global game_state, game_over  # Certifique-se de que 'game_over' esteja acessível
+    global game_state, game_over 
     while game_over:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:  # Pressione Enter para voltar ao menu principal
-                    restart_game()  # Reinicie o jogo aqui
-                    game_state = "menu"  # Mude o estado para o menu
+                if event.key == pygame.K_RETURN:  
+                    restart_game()  
+                    game_state = "menu" 
                     return
 
         screen.blit(scaled_background, (0, 0))
@@ -502,7 +506,7 @@ def game_over_screen():
             "GAME OVER",
             (screen_width // 2, screen_height // 2 - 100),
             font,
-            (255, 0, 0),  # Cor vermelha para 'Game Over'
+            (255, 0, 0),  
             (180, 180, 180),
             shadow_color,
         )
@@ -526,7 +530,6 @@ try:
     icon_image = pygame.image.load(icon_path)
     pygame.display.set_icon(icon_image)
 except pygame.error as e:
-    print(f"Erro ao carregar a imagem do ícone: {e}")
     pygame.quit()
     sys.exit()
 
@@ -534,7 +537,6 @@ try:
     single_player_image = pygame.image.load(single_player_image_path)
     rocket_width, rocket_height = single_player_image.get_size()
 except pygame.error as e:
-    print(f"Erro ao carregar a imagem do foguete: {e}")
     pygame.quit()
     sys.exit()
 
@@ -543,7 +545,6 @@ try:
     pygame.mixer.music.set_volume(volume)
     pygame.mixer.music.play(-1)
 except pygame.error as e:
-    print(f"Erro ao carregar a música: {e}")
     pygame.quit()
     sys.exit()
 
@@ -562,100 +563,6 @@ def draw_text_button(
     screen.blit(shadow_surface, shadow_rect)
     screen.blit(text_surface, text_rect)
     return is_hovered and pygame.mouse.get_pressed()[0]
-
-
-def play_options_screen():
-    global running, screen, fullscreen, screen_width, screen_height, scaled_background, game_state
-    single_player_scaled = pygame.transform.scale(single_player_image, (300, 300))
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    return
-                elif event.key == pygame.K_F11:
-                    fullscreen = not fullscreen
-                    if fullscreen:
-                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-                        screen_width, screen_height = screen.get_size()
-                    else:
-                        screen_width, screen_height = 800, 600
-                        screen = pygame.display.set_mode(
-                            (screen_width, screen_height), pygame.RESIZABLE
-                        )
-                    scaled_background = scale_background()
-            elif event.type == pygame.VIDEORESIZE and not fullscreen:
-                screen_width, screen_height = event.w, event.h
-                screen = pygame.display.set_mode(
-                    (screen_width, screen_height), pygame.RESIZABLE
-                )
-                scaled_background = scale_background()
-
-                new_player_size = (screen_width // 12, screen_height // 12)
-                player_image = pygame.transform.scale(
-                    pygame.image.load(player_image_path), new_player_size
-                )
-                player_width, player_height = player_image.get_size()
-
-        screen.blit(scaled_background, (0, 0))
-
-        button_spacing = screen_width / 2
-        single_pos = (screen_width // 2 - button_spacing // 1.8, screen_height // 2)
-        multi_pos_left = (
-            screen_width // 2 + button_spacing // 2 - 50,
-            screen_height // 2,
-        )
-        multi_pos_right = (
-            screen_width // 2 + button_spacing // 2 + 150,
-            screen_height // 2,
-        )
-
-        single_rect = single_player_scaled.get_rect(center=single_pos)
-
-        multi_rect_left = single_player_scaled.get_rect(center=multi_pos_left)
-        multi_rect_right = single_player_scaled.get_rect(center=multi_pos_right)
-
-        screen.blit(single_player_scaled, single_rect.topleft)
-        screen.blit(single_player_scaled, multi_rect_left.topleft)
-        screen.blit(single_player_scaled, multi_rect_right.topleft)
-
-        single_text_pos = (single_rect.centerx, single_rect.bottom + 30)
-        multi_text_pos = (multi_rect_left.centerx + 150, multi_rect_left.bottom + 30)
-
-        draw_text_button(
-            screen,
-            "Single Player",
-            single_text_pos,
-            small_font,
-            (255, 255, 255),
-            (180, 180, 180),
-            shadow_color,
-        )
-        draw_text_button(
-            screen,
-            "Multiplayer",
-            multi_text_pos,
-            small_font,
-            (255, 255, 255),
-            (180, 180, 180),
-            shadow_color,
-        )
-
-        mouse_pos = pygame.mouse.get_pos()
-        if single_rect.collidepoint(mouse_pos) and pygame.mouse.get_pressed()[0]:
-            print("Single Player selecionado!")
-            game_state = "single_player"
-            return
-        if (
-            multi_rect_left.collidepoint(mouse_pos)
-            or multi_rect_right.collidepoint(mouse_pos)
-        ) and pygame.mouse.get_pressed()[0]:
-            print("Multiplayer selecionado!")
-            game_state = "menu"
-        pygame.display.flip()
-
 
 def options_menu():
     global fullscreen, volume, screen_width, screen_height, screen, scaled_background
@@ -766,14 +673,235 @@ def options_menu():
 def draw_kills_info():
     kills_text = small_font.render(f"Kills: {enemy_kills}/{enemies_to_kill}", True, (255, 255, 255))
     text_width = kills_text.get_width()
-    screen.blit(kills_text, (screen_width - text_width - 20, 50))  # Exibe 20 pixels à esquerda da borda
+    screen.blit(kills_text, (screen_width - text_width - 20, 50))  
 
 def draw_credits_info():
     credits_text = small_font.render(f"Créditos: {credits}", True, (255, 255, 255))
     text_width = credits_text.get_width()
-    screen.blit(credits_text, (screen_width - text_width - 20, 80))  # Exibe 20 pixels à esquerda da borda
+    screen.blit(credits_text, (screen_width - text_width - 20, 80)) 
+
+def singleplayer():
+        global last_spawn_time,enemy_kills,credits,player_health, game_state, game_over,shop_menu
+        screen.blit(scaled_background, (0, 0))
+        screen.blit(player_image, rocket_position)
+        draw_player_health()
+        draw_round_info()
+        draw_credits_info()
+        draw_kills_info()
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_w] or keys[pygame.K_UP]:
+            rocket_position[1] -= rocket_speed * delta_time
+        if keys[pygame.K_s] or keys[pygame.K_DOWN]:
+            rocket_position[1] += rocket_speed * delta_time
+        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
+            rocket_position[0] -= rocket_speed * delta_time
+        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
+            rocket_position[0] += rocket_speed * delta_time
+        if keys[pygame.K_SPACE]:
+            shoot_bullet()
+        rocket_position[0] = max(0, min(rocket_position[0], screen_width - player_width))
+        rocket_position[1] = max(0, min(rocket_position[1], screen_height - player_height))
+
+        current_time = time.time()
+        if current_time - last_spawn_time >= 1:
+            spawn_enemy()
+            last_spawn_time = current_time
+        for bullet in bullets[:]:
+            bullet["y"] -= bullet_speed
+            if bullet["y"] < 0:
+                bullets.remove(bullet)
+            else:
+                pygame.draw.rect(screen, bullet_color, (bullet["x"], bullet["y"], bullet_width, bullet_height))
+
+        for enemy in enemies[:]:
+            enemy["y"] += enemy_speed * delta_time
+            if enemy["y"] > screen_height:
+                enemies.remove(enemy)
+                player_health -= 10 
+            else:
+                screen.blit(enemy_image, (enemy["x"], enemy["y"]))
+                player_rect = pygame.Rect(rocket_position[0], rocket_position[1], player_width, player_height)
+                enemy_rect = pygame.Rect(enemy["x"], enemy["y"], enemy_width, enemy_height)
+                if player_rect.colliderect(enemy_rect):
+                    enemies.remove(enemy)  
+                    player_health -= 20  
+                for bullet in bullets[:]:
+                    bullet_rect = pygame.Rect(bullet["x"], bullet["y"], bullet_width, bullet_height)
+                    if bullet_rect.colliderect(enemy_rect):
+                        bullets.remove(bullet) 
+                        enemy["health"] -= 1
+                        enemy["show_health_bar"] = True
+                        if enemy["health"] <= 0:
+                            enemies.remove(enemy)
+                            enemy_kills += 1
+                            credits += 1
+                        break
+                if enemy["show_health_bar"]: 
+                    health_percentage = enemy["health"] / 3 
+                    bar_width = 40  
+                    bar_height = 5   
+                    current_bar_width = int(bar_width * health_percentage)
+                    pygame.draw.rect(screen, (255, 0, 0), (enemy["x"], enemy["y"] - 10, bar_width, bar_height)) 
+                    pygame.draw.rect(screen, (0, 255, 0), (enemy["x"], enemy["y"] - 10, current_bar_width, bar_height))  
+
+        if enemy_kills >= enemies_to_kill:
+            game_state = "shop"
+        if player_health <= 0:
+            game_over = True  
+            game_state = "game_over" 
+            
+
+def multiplayer():
+        global last_spawn_time,player_health,enemy_kills,credits,enemies_to_kill,game_over,enemies
+        screen.blit(scaled_background, (0, 0))
+        screen.blit(player_image, rocket_position) 
+        screen.blit(player_image, rocket2_position) 
+        draw_player_health() 
+        enemies_to_kill= 999
+        draw_round_info() 
+        draw_credits_info()
+        draw_kills_info() 
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_a]:
+            rocket_position[0] -= rocket_speed * delta_time
+        if keys[pygame.K_d]:
+            rocket_position[0] += rocket_speed * delta_time
+        if keys[pygame.K_w]:
+            rocket_position[1] -= rocket_speed * delta_time
+        if keys[pygame.K_s]:
+            rocket_position[1] += rocket_speed * delta_time
+        rocket_position[0] = max(0, min(screen_width - player_width, rocket_position[0]))
+        rocket_position[1] = max(0, min(screen_height - player_height, rocket_position[1]))
+        if keys[pygame.K_LEFT]:
+            rocket2_position[0] -= rocket_speed * delta_time
+        if keys[pygame.K_RIGHT]:
+            rocket2_position[0] += rocket_speed * delta_time
+        if keys[pygame.K_UP]:
+            rocket2_position[1] -= rocket_speed * delta_time
+        if keys[pygame.K_DOWN]:
+            rocket2_position[1] += rocket_speed * delta_time
+        rocket2_position[0] = max(0, min(screen_width - player_width, rocket2_position[0]))
+        rocket2_position[1] = max(0, min(screen_height - player_height, rocket2_position[1]))
+        current_time = time.time()
+        if current_time - last_spawn_time >= 1:  
+            spawn_enemy()  
+            last_spawn_time = current_time 
+
+        if keys[pygame.K_SPACE]:
+            shoot_bullet()  
+
+        if keys[pygame.K_RSHIFT]:  
+            shoot_bullet2()  
+        for bullet in bullets[:]:
+            bullet['y'] -= bullet_speed
+            if bullet['y'] < 0:
+                bullets.remove(bullet) 
+        for bullet2 in bullets2[:]:
+            bullet2['y'] -= bullet_speed
+            if bullet2['y'] < 0:
+                bullets2.remove(bullet2)  
+
+        for bullet in bullets:
+            pygame.draw.rect(screen, bullet_color, (bullet["x"], bullet["y"], bullet_width, bullet_height))
+
+        for bullet2 in bullets2:
+            pygame.draw.rect(screen, bullet_color2, (bullet2["x"], bullet2["y"], bullet_width, bullet_height))
+
+        for enemy in enemies[:]:
+            enemy["y"] += enemy_speed * delta_time
+
+            if enemy["y"] > screen_height:
+                enemies.remove(enemy)
+                player_health -= 10
+
+            else:
+                screen.blit(enemy_image, (enemy["x"], enemy["y"]))
+
+                player_rect1 = pygame.Rect(rocket_position[0], rocket_position[1], player_width, player_height)
+                player_rect2 = pygame.Rect(rocket2_position[0], rocket2_position[1], player_width, player_height)
+                enemy_rect = pygame.Rect(enemy["x"], enemy["y"], enemy_width, enemy_height)
+
+                if player_rect1.colliderect(enemy_rect):
+                    player_health -= 10
+                    enemies.remove(enemy)
+                if player_rect2.colliderect(enemy_rect):
+                    player_health -= 10
+                    enemies.remove(enemy)
+
+                for bullet in bullets[:]:
+                    bullet_rect = pygame.Rect(bullet["x"], bullet["y"], bullet_width, bullet_height)
+                    if bullet_rect.colliderect(enemy_rect):
+                        bullets.remove(bullet)
+                        enemy["health"] -= bullet_damage
+                        enemy["show_health_bar"] = True
+                        if enemy["health"] <= 0:
+                            enemies.remove(enemy)
+                            enemy_kills += 1
+                            credits += 1
+                            if enemy_kills % 5 == 0:
+                                current_round += 1 
+                        break
+                for bullet2 in bullets2[:]:
+                    bullet2_rect = pygame.Rect(bullet2["x"], bullet2["y"], bullet_width, bullet_height)
+                    if bullet2_rect.colliderect(enemy_rect):
+                        bullets2.remove(bullet2)
+                        enemy["health"] -= bullet_damage
+                        enemy["show_health_bar"] = True
+                        if enemy["health"] <= 0:
+                            enemies.remove(enemy)
+                            enemy_kills += 1
+                            credits += 1
+                            if enemy_kills % 5 == 0:
+                                current_round += 1  
+                        break
+
+                if enemy["show_health_bar"]: 
+                    draw_health_bar(enemy)
 
 
+        if player_health <= 0:
+            game_over = True  
+            game_over_screen()
+       
+        pygame.display.flip()
+
+def menu():
+        screen.blit(scaled_background, (0, 0))
+        play_position = (screen_width // 2, screen_height // 2 - 50 - button_spacing)
+        options_position = (screen_width // 2, screen_height // 2)
+        exit_position = (screen_width // 2, screen_height // 2 + 50 + button_spacing)
+
+        if draw_text_button(
+            screen,
+            "Play",
+            play_position,
+            font,
+            button_text_color,
+            button_hover_color,
+            shadow_color,
+        ):
+            restart_game() 
+            play_options_screen()
+        if draw_text_button(
+            screen,
+            "Options",
+            options_position,
+            font,
+            button_text_color,
+            button_hover_color,
+            shadow_color,
+        ):
+            options_menu()
+        if draw_text_button(
+            screen,
+            "Exit",
+            exit_position,
+            font,
+            button_text_color,
+            button_hover_color,
+            shadow_color,
+        ):
+            running = False
 
 running = True
 
@@ -796,6 +924,7 @@ while running:
             elif event.key == pygame.K_ESCAPE:
                 if game_state == "single_player":
                     game_state = "pause_menu"
+                    game_state == "multiplayer"
 
         elif event.type == pygame.VIDEORESIZE and not fullscreen:
             screen_width, screen_height = event.w, event.h
@@ -805,142 +934,24 @@ while running:
             scaled_background = scale_background()
 
     if game_state == "menu":
-        screen.blit(scaled_background, (0, 0))
-
-        play_position = (screen_width // 2, screen_height // 2 - 50 - button_spacing)
-        options_position = (screen_width // 2, screen_height // 2)
-        exit_position = (screen_width // 2, screen_height // 2 + 50 + button_spacing)
-
-        if draw_text_button(
-            screen,
-            "Play",
-            play_position,
-            font,
-            button_text_color,
-            button_hover_color,
-            shadow_color,
-        ):
-            restart_game()  # Reinicie o jogo quando iniciar
-            game_state = "single_player"
-        if draw_text_button(
-            screen,
-            "Options",
-            options_position,
-            font,
-            button_text_color,
-            button_hover_color,
-            shadow_color,
-        ):
-            options_menu()
-        if draw_text_button(
-            screen,
-            "Exit",
-            exit_position,
-            font,
-            button_text_color,
-            button_hover_color,
-            shadow_color,
-        ):
-            running = False
-
+        menu()
     elif game_state == "single_player":
-        screen.blit(scaled_background, (0, 0))
-        screen.blit(player_image, rocket_position)
+        singleplayer()
 
-        # Desenhe a barra de saúde do jogador
-        draw_player_health()
-        draw_round_info()
-        draw_credits_info()
-        draw_kills_info()
-
-        # Movimento do fogete
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_w] or keys[pygame.K_UP]:
-            rocket_position[1] -= rocket_speed * delta_time
-        if keys[pygame.K_s] or keys[pygame.K_DOWN]:
-            rocket_position[1] += rocket_speed * delta_time
-        if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-            rocket_position[0] -= rocket_speed * delta_time
-        if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            rocket_position[0] += rocket_speed * delta_time
-        if keys[pygame.K_SPACE]:
-            shoot_bullet()
-
-        # Limitar a posição do foguete na tela
-        rocket_position[0] = max(0, min(rocket_position[0], screen_width - player_width))
-        rocket_position[1] = max(0, min(rocket_position[1], screen_height - player_height))
-
-        current_time = time.time()
-        if current_time - last_spawn_time >= 1:
-            spawn_enemy()
-            last_spawn_time = current_time
-
-        # Desenhar balas
-        for bullet in bullets[:]:
-            bullet["y"] -= bullet_speed
-            if bullet["y"] < 0:
-                bullets.remove(bullet)  # Remove balas que saíram da tela
-            else:
-                pygame.draw.rect(screen, bullet_color, (bullet["x"], bullet["y"], bullet_width, bullet_height))
-
-        for enemy in enemies[:]:
-            enemy["y"] += enemy_speed * delta_time
-            if enemy["y"] > screen_height:
-                enemies.remove(enemy)
-                player_health -= 10  # Jogador perde saúde quando um inimigo atinge a parte inferior
-            else:
-                screen.blit(enemy_image, (enemy["x"], enemy["y"]))
-
-                # Verifica colisão entre o foguete e os inimigos
-                player_rect = pygame.Rect(rocket_position[0], rocket_position[1], player_width, player_height)
-                enemy_rect = pygame.Rect(enemy["x"], enemy["y"], enemy_width, enemy_height)
-
-                if player_rect.colliderect(enemy_rect):
-                    enemies.remove(enemy)  # Remove o inimigo que colidiu
-                    player_health -= 20  # O jogador perde saúde ao colidir com um inimigo
-
-                # Verifica colisão entre balas e inimigos
-                for bullet in bullets[:]:
-                    bullet_rect = pygame.Rect(bullet["x"], bullet["y"], bullet_width, bullet_height)
-                    if bullet_rect.colliderect(enemy_rect):
-                        bullets.remove(bullet)  # Remove a bala que colidiu
-                        enemy["health"] -= 1
-                        enemy["show_health_bar"] = True
-                        if enemy["health"] <= 0:
-                            enemies.remove(enemy)
-                            enemy_kills += 1
-                            credits += 1
-                        break
-
-                # Desenhar a barra de saúde do inimigo
-                if enemy["show_health_bar"]:  # Verifica se deve mostrar a barra de saúde
-                    health_percentage = enemy["health"] / 3  # Supondo que 3 seja a saúde total inicial
-                    bar_width = 40  # Largura da barra de saúde
-                    bar_height = 5   # Altura da barra de saúde
-                    current_bar_width = int(bar_width * health_percentage)
-                    pygame.draw.rect(screen, (255, 0, 0), (enemy["x"], enemy["y"] - 10, bar_width, bar_height))  # Barra vermelha
-                    pygame.draw.rect(screen, (0, 255, 0), (enemy["x"], enemy["y"] - 10, current_bar_width, bar_height))  # Barra verde
-
-        # Atualiza as informações sobre os inimigos eliminados e os créditos
-
-        if enemy_kills >= enemies_to_kill:
-            game_state = "shop"  # Muda o estado do jogo para a loja
-        # Checa se a saúde do jogador é menor ou igual a 0 para encerrar o jogo
-        if player_health <= 0:
-            game_over = True  # Ativar estado de Game Over
-            game_state = "game_over"  # Alterar estado do jogo
+    elif game_state == "multiplayer":
+        multiplayer()
 
     elif game_state == "pause_menu":
-        pause_menu()
+        pause_menu()    
 
     elif game_state == "game_over":
-        game_over_screen()  # Chama a função para a tela de Game Over
+        game_over_screen() 
 
     elif game_state == "shop":
         player_health = player_max_health
         shop_menu()
     pygame.display.flip()
-    clock.tick(60)  # Mantém o jogo em 60 quadros por segundo
+    clock.tick(60)  
 
     
 pygame.quit()
