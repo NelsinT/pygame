@@ -51,6 +51,21 @@ player_health = player_max_health
 current_round = 1
 enemies_to_kill = 5 
 
+upgrade_limits = {
+    "speed": 10,
+    "damage": 10,
+    "health": 10,
+    "fire_rate": 10,
+}
+
+upgrades = {
+    "speed": 0,
+    "damage": 0,
+    "health": 0,
+    "fire_rate": 0,
+}
+
+
 clock = pygame.time.Clock()
 delta_time = clock.tick(60)/20
 game_over = False
@@ -180,76 +195,118 @@ def pause_menu():
             return
 
         pygame.display.flip()
-
 def shop_menu():
-    global game_state, current_round, enemies_to_kill, enemy_kills, credits
+    global game_state, current_round, enemies_to_kill, enemy_kills, credits, enemies, running , screen , screen_width, screen_height, scaled_background, fullscreen
+    # while game_state == "shop":
+    #     for event in pygame.event.get():
+    #         if event.type == pygame.QUIT:
+    #             pygame.quit()
+    #             sys.exit()
+    #         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+    #             game_state = "single_player"  # Voltar ao jogo se o jogador pressionar Esc
 
-    # Aqui não reiniciamos os créditos
     while game_state == "shop":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                game_state = "single_player"  # Voltar ao jogo se o jogador pressionar Esc
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:  
+                    game_state = "single_player"
+                elif event.key == pygame.K_F11:  
+                    fullscreen = not fullscreen
+                    if fullscreen:
+                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        screen_width, screen_height = screen.get_size()
+                    else:
+                        screen_width, screen_height = 800, 600
+                        screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                    scaled_background = scale_background()
+
+            elif event.type == pygame.VIDEORESIZE and not fullscreen:
+                screen_width, screen_height = event.w, event.h
+                screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
+                scaled_background = scale_background()
 
         screen.blit(scaled_background, (0, 0))
         
+        # Definindo posições e tamanhos baseados em proporções da tela
+        center_x = screen_width // 2
+        base_y = screen_height // 2
+        
         draw_text_button(
             screen,
-            f"Rodada {current_round}",
-            (screen_width // 2, screen_height // 2 - 100),
+            f"Round {current_round}",
+            (center_x, base_y - int(0.2 * screen_height)),  # 20% do topo
             font,
-            (255, 255, 255),
+            (255, 255, 255),  # Texto branco
             (180, 180, 180),
             shadow_color,
         )
         draw_text_button(
             screen,
             f"Kills: {enemy_kills}/{enemies_to_kill}",
-            (screen_width // 2, screen_height // 2 - 50),
+            (center_x, base_y - int(0.15 * screen_height)),  # 15% do topo
             small_font,
-            (255, 255, 255),
+            (255, 255, 255),  # Texto branco
             (180, 180, 180),
             shadow_color,
         )
         draw_text_button(
             screen,
             f"Créditos: {credits}",
-            (screen_width // 2, screen_height // 2),
+            (center_x, base_y - int(0.1 * screen_height)),  # 10% do topo
             small_font,
-            (255, 255, 255),
+            (255, 255, 255),  # Texto branco
             (180, 180, 180),
             shadow_color,
         )
         
+        # Mostrar Upgrades
+        upgrade_text_position = (center_x, base_y - int(0.06 * screen_height))  # 6% do topo
+        for index, (upgrade_name, count) in enumerate(upgrades.items()):
+            base_text = f"{upgrade_name.capitalize()}: "
+            count_text = f"{count}/{upgrade_limits[upgrade_name]}"
+
+            # Desenhar parte do texto em branco
+            draw_text_button(
+                screen,
+                base_text,
+                (upgrade_text_position[0], upgrade_text_position[1] + index * int(0.03 * screen_height)),  # 3% de altura para espaçamento
+                small_font,
+                (255, 255, 255),  # Texto branco
+                (180, 180, 180),
+                shadow_color,
+            )
+
+            # Desenhar parte do texto (nivel do upgrade) em vermelho
+            draw_text_button(
+                screen,
+                count_text,
+                (upgrade_text_position[0] + font.size(base_text)[0], upgrade_text_position[1] + index * int(0.03 * screen_height)),  # 3% de altura para espaçamento
+                small_font,
+                (255, 0, 0),  # Texto em vermelho
+                (180, 180, 180),
+                shadow_color,
+            )
+
+        # Botão para Avançar para a Próxima Rodada
         if draw_text_button(
             screen,
             "Avançar para a próxima rodada",
-            (screen_width // 2, screen_height // 2 + 50),
+            (center_x, base_y + int(0.05 * screen_height)),  # 5% abaixo do centro
             small_font,
-            (255, 255, 255),
+            (255, 255, 255),  # Texto branco
             (180, 180, 180),
             shadow_color,
         ):
-            # Reiniciando apenas a quantidade de inimigos a serem eliminados para a próxima rodada
+            # Resetar a lista de inimigos para que eles não persistam
+            enemies.clear()
             current_round += 1
-            enemies_to_kill += 5  # Aumentar a meta de eliminados para a próxima rodada
-            # Não reinicie enemy_kills nem credits aqui
+            enemies_to_kill += 5  # Aumentar inimigos a matar para a próxima rodada
             game_state = "single_player"  # Retornar ao jogo
 
-        if draw_text_button(
-            screen,
-            "Sair",
-            (screen_width // 2, screen_height // 2 + 100),
-            small_font,
-            (255, 255, 255),
-            (180, 180, 180),
-            shadow_color,
-        ):
-            game_state = "menu"  # Retornar ao menu principal
-
         pygame.display.flip()
+
 
 def draw_round_info():
     round_text = small_font.render(f"Rodada: {current_round}", True, (255, 255, 255))
@@ -345,13 +402,14 @@ def draw_health_bar(enemy):
 
 
 def restart_game():
-    global player_health, rocket_position, bullets, enemies, enemy_kills, credits, game_over
+    global player_health, rocket_position, bullets, enemies, enemy_kills, credits, game_over , current_round
     player_health = 100  # Defina a saúde inicial do jogador
     rocket_position = [screen_width // 2, screen_height // 2]  # Resetar a posição do jogador
     bullets = []  # Reinicie a lista de balas
     enemies = []  # Reinicie a lista de inimigos
     enemy_kills = 0  # Reinicie o contador de inimigos eliminados
     credits = 0  # Reinicie os créditos
+    current_round = 1
     game_over = False  # Reinicie o estado de Game Over
 
 
@@ -755,7 +813,7 @@ while running:
             shadow_color,
         ):
             restart_game()  # Reinicie o jogo quando iniciar
-            game_state = "single_player"
+            game_state = "shop"
         if draw_text_button(
             screen,
             "Options",
